@@ -1,0 +1,4 @@
+*.o
+wav-generator
+wav-analyzer
+*.wav
