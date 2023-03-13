@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0+
 
 CC := $(CROSS_COMPILE)gcc
-CFLAGS := -Wall -Wextra -Wpedantic -I.
-LIBS := -lm -lgsl # Requires libgsl-dev on Ubuntu
+CFLAGS := -Wall -Wextra -Wpedantic -I. $(shell pkg-config --cflags gsl)
+LIBS := $(shell pkg-config --libs gsl) # Requires libgsl-dev on Ubuntu
 
 .PHONY: clean all
 
