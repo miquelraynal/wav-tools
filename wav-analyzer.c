@@ -160,13 +160,23 @@ static void extract_frequencies(unsigned int *freqs, unsigned int *nfreqs,
 	}
 }
 
-static int32_t get_sample(int32_t *buf, unsigned int chan,
-			  unsigned int channels, unsigned int sample)
+static double get_sample(uint8_t *buf, unsigned int chan,
+			 unsigned int sample, const struct audio *wav)
 {
-	return buf[(channels * sample) + chan];
+	int16_t *buf_i16 = (int16_t *)buf;
+	int32_t *buf_i32 = (int32_t *)buf;
+
+	switch (wav->bits_per_sample) {
+	case 16:
+		return buf_i16[(wav->channels * sample) + chan];
+	case 32:
+		return buf_i32[(wav->channels * sample) + chan];
+	default:
+		return 0;
+	};
 }
 
-static void extract_channel(double *wave, int32_t *buf, unsigned int chan,
+static void extract_channel(double *wave, uint8_t *buf, unsigned int chan,
 			    const struct audio *wav)
 {
 	unsigned int s;
@@ -176,9 +186,6 @@ static void extract_channel(double *wave, int32_t *buf, unsigned int chan,
 	case 16:
 		factor = INT16_MAX;
 		break;
-	case 24:
-		factor = 0x7FFFFF;
-		break;
 	case 32:
 		factor = INT32_MAX;
 		break;
@@ -187,7 +194,7 @@ static void extract_channel(double *wave, int32_t *buf, unsigned int chan,
 	};
 
 	for (s = 0; s < wav->samples_per_chan; s++)
-		wave[s] = (double)get_sample(buf, chan, wav->channels, s) / factor;
+		wave[s] = get_sample(buf, chan, s, wav) / factor;
 }
 
 static int extract_audio_parameters(struct wav_format *wav_format, struct audio *wav)
@@ -207,7 +214,6 @@ static int extract_audio_parameters(struct wav_format *wav_format, struct audio 
 	switch (wav->bits_per_sample) {
 	case 32:
 		break;
-	case 24:
 	case 16:
 		fprintf(stderr, "FYI: Untested behavior\n");
 		break;
@@ -286,7 +292,7 @@ int main(int argc, char *argv[])
 	unsigned int **cfreqs, **efreqs, *ncfreqs;
 	unsigned int offset, slide, windows_sz, i, c;
 	size_t sz, data_sz;
-	int32_t *buf;
+	uint8_t *buf;
 	double *wave, *thresholds;
 	int ret = -1;
 
