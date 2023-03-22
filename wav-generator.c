@@ -20,28 +20,27 @@
 #define DEFAULT_DURATION 10
 #define DEFAULT_NFREQS 4
 
-static void fill_audio_buf(int32_t *buf, double **waves, const struct audio *wav)
+static void fill_audio_buf(uint8_t *buf, double **waves, const struct audio *wav)
 {
+	int16_t *buf_i16 = (int16_t *)buf;
+	int32_t *buf_i32 = (int32_t *)buf;
 	unsigned int s, c;
-	int factor;
 
 	switch (wav->bits_per_sample) {
 	case 16:
-		factor = INT16_MAX;
-		break;
-	case 24:
-		factor = 0x7FFFFF;
+		for (s = 0; s < wav->samples_per_chan; s++)
+			for (c = 0; c < wav->channels; c++)
+				buf_i16[(s * wav->channels) + c] = waves[c][s] * INT16_MAX;
 		break;
 	case 32:
-		factor = INT32_MAX;
+		for (s = 0; s < wav->samples_per_chan; s++)
+			for (c = 0; c < wav->channels; c++)
+				buf_i32[(s * wav->channels) + c] = waves[c][s] * INT32_MAX;
 		break;
 	default:
-		factor = 0;
+		/* Checked in parse_args() */
+		break;
 	};
-
-	for (s = 0; s < wav->samples_per_chan; s++)
-		for (c = 0; c < wav->channels; c++)
-			buf[(s * wav->channels) + c] = waves[c][s] * factor;
 }
 
 static void fill_audio_wave(double *wave, unsigned int *freqs, const struct audio *wav)
@@ -78,7 +77,7 @@ static void print_help(FILE *fd, char *tool_name)
 		"%s [-c <nchans>] [-r <rate>] [-b <bps>] [-d <duration>] [-f <nfreqs>] > play.wav\n"
 		"	-c: Number of channels (default: %u)\n"
 		"	-r: Sampling rate in Hz (default: %u, min: %u)\n"
-		"	-b: Bits per sample (default: %u, supp: 16, 24, 32)\n"
+		"	-b: Bits per sample (default: %u, supp: 16, 32)\n"
 		"	-d: Duration in seconds (default: %u, min: %u)\n"
 		"	-f: Number of frequencies per channel (default: %u)\n\n",
 		tool_name, DEFAULT_NCHANS, DEFAULT_RATE, 2 * MIN_FREQ, DEFAULT_BPS,
@@ -144,7 +143,7 @@ static int parse_args(int argc, char *argv[], struct audio *wav)
 		return -1;
 	}
 
-	if (wav->bits_per_sample != 16 && wav->bits_per_sample != 24 && wav->bits_per_sample != 32) {
+	if (wav->bits_per_sample != 16 && wav->bits_per_sample != 32) {
 		fprintf(stderr, "Unsupported number of bits per sample\n");
 		print_help(stderr, tool_name);
 		return -1;
@@ -195,7 +194,7 @@ int main(int argc, char *argv[])
 	unsigned int data_sz;
 	unsigned int c;
 	double **waves;
-	int32_t *buf;
+	uint8_t *buf;
 	int ret = -1;
 
 	/* Parse args */
@@ -234,14 +233,14 @@ int main(int argc, char *argv[])
 		fill_audio_wave(waves[c], freqs[c], &wav);
 
 	/* Generate audio buffer */
-	buf = calloc(wav.channels * wav.samples_per_chan, sizeof(int32_t));
+	data_sz = wav.channels * wav.samples_per_chan * wav.bits_per_sample / 8;
+	buf = calloc(data_sz, 1);
 	if (!buf)
 		goto free_waves;
 
 	fill_audio_buf(buf, waves, &wav);
 
 	/* Generate the final *.wav output */
-	data_sz = wav.channels * wav.samples_per_chan * sizeof(uint32_t);
 	riff.wav_container.fmt_container.wav_format.data_container.chunk_size = data_sz;
 	riff.file_len = sizeof(riff) + data_sz;
 
