@@ -70,3 +70,34 @@ int fill_desired_freqs(unsigned int **freqs, const struct audio *wav);
 void free_array(void **array, unsigned int n);
 void **alloc_matrix(unsigned int narrays, unsigned int nentries,
 		    unsigned int elem_size);
+
+/* The cleverness for int24_t, i32_to_i24 and i24_to_i32 is taken from PipeWire,
+   see spa/plugins/audiomixer/mix-ops.h. Licensed under MIT. The project's
+   reference website is: https://pipewire.org/
+ */
+
+typedef struct {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	uint8_t v3;
+	uint8_t v2;
+	int8_t v1;
+#else
+	int8_t v1;
+	uint8_t v2;
+	uint8_t v3;
+#endif
+} __attribute__ ((packed)) int24_t;
+
+static inline int24_t i32_to_i24(int32_t a)
+{
+	return (int24_t) {
+		.v1 = (int8_t)(((int32_t)a) >> 16),
+		.v2 = (uint8_t)(((uint32_t)a) >> 8),
+		.v3 = (uint8_t)((uint32_t)a),
+	};
+}
+
+static inline int32_t i24_to_i32(int24_t a)
+{
+	return ((int32_t)a.v1 << 16) | ((uint32_t)a.v2 << 8) | (uint32_t)a.v3;
+}
