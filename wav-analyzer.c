@@ -164,11 +164,14 @@ static double get_sample(uint8_t *buf, unsigned int chan,
 			 unsigned int sample, const struct audio *wav)
 {
 	int16_t *buf_i16 = (int16_t *)buf;
+	int24_t *buf_i24 = (int24_t *)buf;
 	int32_t *buf_i32 = (int32_t *)buf;
 
 	switch (wav->bits_per_sample) {
 	case 16:
 		return buf_i16[(wav->channels * sample) + chan];
+	case 24:
+		return i24_to_i32(buf_i24[(wav->channels * sample) + chan]);
 	case 32:
 		return buf_i32[(wav->channels * sample) + chan];
 	default:
@@ -185,6 +188,9 @@ static void extract_channel(double *wave, uint8_t *buf, unsigned int chan,
 	switch (wav->bits_per_sample) {
 	case 16:
 		factor = INT16_MAX;
+		break;
+	case 24:
+		factor = 0x7FFFFF;
 		break;
 	case 32:
 		factor = INT32_MAX;
@@ -212,10 +218,9 @@ static int extract_audio_parameters(struct wav_format *wav_format, struct audio 
 
 	wav->bits_per_sample = wav_format->pcm_format.bits_per_sample;
 	switch (wav->bits_per_sample) {
-	case 32:
-		break;
 	case 16:
-		fprintf(stderr, "FYI: Untested behavior\n");
+	case 24:
+	case 32:
 		break;
 	default:
 		fprintf(stderr, "Unsupported: %u bits per sample\n",
