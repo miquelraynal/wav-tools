@@ -23,6 +23,7 @@
 static void fill_audio_buf(uint8_t *buf, double **waves, const struct audio *wav)
 {
 	int16_t *buf_i16 = (int16_t *)buf;
+	int24_t *buf_i24 = (int24_t *)buf;
 	int32_t *buf_i32 = (int32_t *)buf;
 	unsigned int s, c;
 
@@ -31,6 +32,12 @@ static void fill_audio_buf(uint8_t *buf, double **waves, const struct audio *wav
 		for (s = 0; s < wav->samples_per_chan; s++)
 			for (c = 0; c < wav->channels; c++)
 				buf_i16[(s * wav->channels) + c] = waves[c][s] * INT16_MAX;
+		break;
+	case 24:
+		for (s = 0; s < wav->samples_per_chan; s++)
+			for (c = 0; c < wav->channels; c++)
+				buf_i24[(s * wav->channels) + c] =
+					i32_to_i24((int32_t)(waves[c][s] * 0x7FFFFF));
 		break;
 	case 32:
 		for (s = 0; s < wav->samples_per_chan; s++)
@@ -77,7 +84,7 @@ static void print_help(FILE *fd, char *tool_name)
 		"%s [-c <nchans>] [-r <rate>] [-b <bps>] [-d <duration>] [-f <nfreqs>] > play.wav\n"
 		"	-c: Number of channels (default: %u)\n"
 		"	-r: Sampling rate in Hz (default: %u, min: %u)\n"
-		"	-b: Bits per sample (default: %u, supp: 16, 32)\n"
+		"	-b: Bits per sample (default: %u, supp: 16, 24, 32)\n"
 		"	-d: Duration in seconds (default: %u, min: %u)\n"
 		"	-f: Number of frequencies per channel (default: %u)\n\n",
 		tool_name, DEFAULT_NCHANS, DEFAULT_RATE, 2 * MIN_FREQ, DEFAULT_BPS,
@@ -143,7 +150,8 @@ static int parse_args(int argc, char *argv[], struct audio *wav)
 		return -1;
 	}
 
-	if (wav->bits_per_sample != 16 && wav->bits_per_sample != 32) {
+	if (wav->bits_per_sample != 16 && wav->bits_per_sample != 24 &&
+			wav->bits_per_sample != 32) {
 		fprintf(stderr, "Unsupported number of bits per sample\n");
 		print_help(stderr, tool_name);
 		return -1;
